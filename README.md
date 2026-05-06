@@ -88,35 +88,35 @@ graph LR
 ```mermaid
 sequenceDiagram
     participant CLI as main.py
-    participant Loop as agent_loop.py
+    participant Agent as agent_loop.py
     participant K8s as k8s modules
     participant LLM as llm engine
     participant EKS as AWS EKS
     participant GPT as GPT-4o
 
-    CLI->>Loop: run(manifest)
+    CLI->>Agent: run(manifest)
     
     rect rgb(40, 40, 60)
         Note right of CLI: Iteration 1..5
-        Loop->>K8s: apply_manifest(yaml)
+        Agent->>K8s: apply_manifest(yaml)
         K8s->>EKS: Create/Update Resources
         
-        Loop->>K8s: poll_until_ready()
+        Agent->>K8s: poll_until_ready()
         K8s->>EKS: Watch Pod Status
         
         alt All Pods Ready
-            K8s-->>Loop: SUCCESS
-            Loop-->>CLI: Exit 0
+            K8s-->>Agent: SUCCESS
+            Agent-->>CLI: Exit 0
         else Failure Detected
-            K8s-->>Loop: FAILED
-            Loop->>K8s: collect_debug_bundle()
+            K8s-->>Agent: FAILED
+            Agent->>K8s: collect_debug_bundle()
             K8s->>EKS: Describe + Logs + Events
             
-            Loop->>LLM: diagnose(yaml, debug_bundle)
+            Agent->>LLM: diagnose(yaml, debug_bundle)
             LLM->>GPT: Structured Output Request
             GPT-->>LLM: LLMDiagnosis JSON
             
-            Note over Loop: Update YAML, next iteration
+            Note over Agent: Update YAML, next iteration
         end
     end
 ```
