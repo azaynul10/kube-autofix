@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">
-  Kube-AutoFix 🤖🚀
+  Kube-AutoFix 
 </h1>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 ---
 
-## 🧠 What is Kube-AutoFix?
+##  What is Kube-AutoFix?
 
 **Kube-AutoFix** is a production-grade, autonomous agent that closes the loop between *"my deployment is broken"* and *"my deployment is fixed"* — without human intervention. It combines the **official Kubernetes Python Client** with **GPT-4o's structured reasoning** to execute a self-healing cycle that mimics what a Staff-Level SRE would do manually, but in seconds.
 
@@ -35,18 +35,18 @@
 
 ---
 
-## 🌟 The Agentic Loop in Action
+## The Agentic Loop in Action
 
 When a broken manifest is applied, Kube-AutoFix executes the following **fully autonomous loop**:
 
 ```mermaid
 graph LR
-    A["📄 Broken YAML"] --> B["🚀 Deploy"]
-    B --> C["👁️ Monitor Pods"]
-    C -->|"✅ All Ready"| D["🎉 SUCCESS"]
-    C -->|"❌ Failure"| E["🔍 Debug"]
-    E --> F["🧠 GPT-4o Reasoning"]
-    F --> G["📝 Corrected YAML"]
+    A["📄 Broken YAML"] --> B[" Deploy"]
+    B --> C[" Monitor Pods"]
+    C -->|" All Ready"| D[" SUCCESS"]
+    C -->|" Failure"| E[" Debug"]
+    E --> F[" GPT-4o Reasoning"]
+    F --> G[" Corrected YAML"]
     G --> B
     
     style A fill:#ff6b6b,stroke:#333,color:#fff
@@ -71,19 +71,19 @@ graph LR
 
 | Feature | Description |
 | :--- | :--- |
-| 🤖 **Fully Autonomous** | Zero human intervention from broken manifest to healthy deployment |
-| 🧠 **GPT-4o Structured Outputs** | Uses `response_format=LLMDiagnosis` — guaranteed valid JSON, every time |
-| 🔒 **Namespace Isolation** | Agent is **locked** to `autofix-agent-env`. Cannot touch other namespaces |
-| 🎯 **7 Failure Types** | Detects `ImagePullBackOff`, `CrashLoopBackOff`, `OOMKilled`, `ErrImagePull`, and more |
-| 🌡️ **Deterministic Fixes** | `temperature=0.2` for consistent, conservative repairs |
-| 🔁 **Tenacity Retries** | Exponential backoff on transient K8s and OpenAI API failures |
-| 🖥️ **Rich Terminal UI** | Beautiful spinners, color-coded panels, syntax-highlighted YAML, summary tables |
-| 🧪 **Dry-Run Mode** | `--dry-run` flag to inspect the LLM's fix without applying it |
-| 📊 **Iteration Tracking** | Full summary table with confidence scores, durations, and outcomes |
+|  **Fully Autonomous** | Zero human intervention from broken manifest to healthy deployment |
+|  **GPT-4o Structured Outputs** | Uses `response_format=LLMDiagnosis` — guaranteed valid JSON, every time |
+|  **Namespace Isolation** | Agent is **locked** to `autofix-agent-env`. Cannot touch other namespaces |
+|  **7 Failure Types** | Detects `ImagePullBackOff`, `CrashLoopBackOff`, `OOMKilled`, `ErrImagePull`, and more |
+|  **Deterministic Fixes** | `temperature=0.2` for consistent, conservative repairs |
+|  **Tenacity Retries** | Exponential backoff on transient K8s and OpenAI API failures |
+|  **Rich Terminal UI** | Beautiful spinners, color-coded panels, syntax-highlighted YAML, summary tables |
+|  **Dry-Run Mode** | `--dry-run` flag to inspect the LLM's fix without applying it |
+|  **Iteration Tracking** | Full summary table with confidence scores, durations, and outcomes |
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```mermaid
 sequenceDiagram
@@ -123,7 +123,7 @@ sequenceDiagram
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
@@ -138,23 +138,23 @@ sequenceDiagram
 
 ---
 
-## 🔒 Safety Guardrails
+##  Safety Guardrails
 
 Because this agent modifies **live infrastructure**, strict operational boundaries are enforced at **three layers**:
 
 | Guardrail | Enforcement Layer | Detail |
 | :--- | :--- | :--- |
-| 🔐 **Namespace Lock** | Python + Prompt | Hardcoded to `autofix-agent-env`. The deployer forces `namespace=autofix-agent-env` on every resource |
-| 🔢 **Max Iterations** | Python | Hard cap of 5 retries (configurable up to 10). Prevents infinite loops |
-| 🌡️ **Deterministic AI** | Prompt | `temperature=0.2` for conservative, reproducible fixes |
-| ⚖️ **Minimal Changes** | Prompt | LLM instructed: "Make the SMALLEST possible change to fix the root cause" |
-| 💾 **Resource Preservation** | Prompt | Never alter CPU/memory limits unless diagnosing `OOMKilled` |
-| 🏗️ **No New Resources** | Prompt | LLM cannot add Services/ConfigMaps unless explicitly required |
-| ✅ **YAML Validation** | Python | Post-LLM validation: syntax check, required fields, namespace override protection |
+|  **Namespace Lock** | Python + Prompt | Hardcoded to `autofix-agent-env`. The deployer forces `namespace=autofix-agent-env` on every resource |
+|  **Max Iterations** | Python | Hard cap of 5 retries (configurable up to 10). Prevents infinite loops |
+|  **Deterministic AI** | Prompt | `temperature=0.2` for conservative, reproducible fixes |
+|  **Minimal Changes** | Prompt | LLM instructed: "Make the SMALLEST possible change to fix the root cause" |
+|  **Resource Preservation** | Prompt | Never alter CPU/memory limits unless diagnosing `OOMKilled` |
+|  **No New Resources** | Prompt | LLM cannot add Services/ConfigMaps unless explicitly required |
+|  **YAML Validation** | Python | Post-LLM validation: syntax check, required fields, namespace override protection |
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### 1. Install
 
@@ -185,7 +185,7 @@ Watch the agent detect `ImagePullBackOff`, consult GPT-4o, and fix `nginx:latest
 
 ---
 
-## 🎮 CLI Options
+##  CLI Options
 
 ```bash
 Usage: main.py [OPTIONS]
@@ -242,7 +242,7 @@ kube-autofix/
 
 ---
 
-## 🧪 How It Was Built
+##  How It Was Built
 
 This project was built in **4 rigorous phases**, each reviewed and approved before proceeding:
 
@@ -255,7 +255,7 @@ This project was built in **4 rigorous phases**, each reviewed and approved befo
 
 ---
 
-## 🧠 The LLM Prompt Strategy
+##  The LLM Prompt Strategy
 
 The system prompt casts GPT-4o as a **Staff-Level Kubernetes SRE** with **7 strict operational boundaries**:
 
