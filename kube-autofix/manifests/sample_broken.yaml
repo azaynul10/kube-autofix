@@ -1,0 +1,38 @@
+# ============================================================
+# Kube-AutoFix — Sample BROKEN Manifest
+# ============================================================
+# This Deployment intentionally uses a non-existent image tag
+# ("nginx:latestttt") to trigger an ImagePullBackOff error.
+# The agent should detect this failure and ask GPT-4o to fix it.
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autofix-test-nginx
+  labels:
+    app: autofix-test-nginx
+    managed-by: kube-autofix
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: autofix-test-nginx
+  template:
+    metadata:
+      labels:
+        app: autofix-test-nginx
+        managed-by: kube-autofix
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latestttt
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
