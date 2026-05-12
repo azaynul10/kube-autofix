@@ -17,3 +17,8 @@ logs/
 .vscode/
 .idea/
 *.swp
+
+# Excluded files
+.history/
+kiro-ambassador-article.md
+autonomous_kubernetes_agent.ipynb
