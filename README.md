@@ -300,9 +300,9 @@ AI agents need observability because they operate autonomously and can make inco
 
 ### MLflow Observability Demo
 
-Demo recording generated from synthetic MLflow traces to show the observability interface. No live Kubernetes cluster or OpenAI call was executed in this environment.
+This screenshot shows the MLflow observability interface using synthetic demo traces. No live Kubernetes cluster or OpenAI call was executed in this recording environment.
 
-![MLflow Observability Demo](assets/mlflow-dashboard-demo.webp)
+![MLflow Observability Screenshot](assets/mlflow-dashboard-screenshot.png)
 
 To reproduce the demo locally:
 
