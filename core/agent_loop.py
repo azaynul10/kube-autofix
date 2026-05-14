@@ -60,6 +60,8 @@ class LoopResult:
 # ── Agent Loop ────────────────────────────────────────────────────────
 
 
+from observability.mlflow_tracker import MLflowTracker
+
 class AgentLoop:
     """
     The autonomous debugging loop that ties together all modules.
@@ -80,6 +82,7 @@ class AgentLoop:
         llm_engine: LLMEngine,
         settings: Settings,
         console: Console,
+        tracker: MLflowTracker | None = None,
     ) -> None:
         self._deployer = deployer
         self._monitor = monitor
@@ -87,15 +90,17 @@ class AgentLoop:
         self._llm = llm_engine
         self._settings = settings
         self._console = console
+        self._tracker = tracker
 
     # ── Main entry point ──────────────────────────────────────────
 
-    def run(self, initial_yaml: str) -> LoopResult:
+    def run(self, initial_yaml: str, manifest_name: str = "manifest.yaml") -> LoopResult:
         """
         Execute the autonomous fix loop.
 
         Args:
             initial_yaml: The initial (potentially broken) YAML manifest.
+            manifest_name: Optional name for tracking.
 
         Returns:
             LoopResult with success status, iteration records, and final YAML.
@@ -106,24 +111,38 @@ class AgentLoop:
         current_yaml = initial_yaml
         records: list[IterationRecord] = []
 
-        console.print()
-        console.print(
-            Rule(
-                f"[bold cyan]Starting Autonomous Fix Loop[/] "
-                f"[dim](max {max_iter} iterations)[/dim]",
-                style="cyan",
+        if self._tracker:
+            self._tracker.start_loop_run(
+                manifest_path_or_name=manifest_name,
+                model_name=settings.openai_model,
+                namespace=KUBE_NAMESPACE,
+                max_iterations=max_iter,
+                dry_run=settings.dry_run,
             )
-        )
-        console.print()
 
-        for iteration in range(1, max_iter + 1):
-            iter_start = time.time()
-            record = IterationRecord(iteration=iteration, outcome="unknown")
+        unhandled_error = True
+        try:
+            console.print()
+            console.print(
+                Rule(
+                    f"[bold cyan]Starting Autonomous Fix Loop[/] "
+                    f"[dim](max {max_iter} iterations)[/dim]",
+                    style="cyan",
+                )
+            )
+            console.print()
 
-            # ── Iteration header ──────────────────────────────────
-            self._print_iteration_header(iteration, max_iter)
+            for iteration in range(1, max_iter + 1):
+                iter_start = time.time()
+                record = IterationRecord(iteration=iteration, outcome="unknown")
 
-            # ── Step 1: Deploy ────────────────────────────────────
+                if self._tracker:
+                    self._tracker.log_iteration_start(iteration)
+
+                # ── Iteration header ──────────────────────────────────
+                self._print_iteration_header(iteration, max_iter)
+
+                # ── Step 1: Deploy ────────────────────────────────────
             if settings.dry_run and iteration > 1:
                 # In dry-run mode, don't apply after iteration 1
                 console.print(
@@ -135,18 +154,28 @@ class AgentLoop:
                 records.append(record)
                 break
 
-            deploy_result = self._step_deploy(current_yaml)
-            if not deploy_result.success:
-                console.print(
-                    f"[bold red]  Deploy failed:[/] {deploy_result.message}"
-                )
-                record.outcome = "deploy_error"
-                record.failure_reason = deploy_result.message
-                record.duration_seconds = time.time() - iter_start
-                records.append(record)
-                continue
+                deploy_result = self._step_deploy(current_yaml)
+                if self._tracker:
+                    self._tracker.log_deploy_result(
+                        iteration,
+                        deploy_result.success,
+                        deploy_result.message,
+                        deploy_result.resources_created,
+                        deploy_result.resources_failed,
+                    )
+                if not deploy_result.success:
+                    console.print(
+                        f"[bold red]  Deploy failed:[/] {deploy_result.message}"
+                    )
+                    record.outcome = "deploy_error"
+                    record.failure_reason = deploy_result.message
+                    record.duration_seconds = time.time() - iter_start
+                    records.append(record)
+                    if self._tracker:
+                        self._tracker.log_iteration_end(iteration, record.outcome, record.duration_seconds)
+                    continue
 
-            # ── Step 2: Monitor ───────────────────────────────────
+                # ── Step 2: Monitor ───────────────────────────────────
             label_selector = KubeMonitor.label_selector_from_manifest(
                 current_yaml
             )
@@ -160,46 +189,65 @@ class AgentLoop:
                 records.append(record)
                 continue
 
-            monitor_result = self._step_monitor(label_selector)
+                monitor_result = self._step_monitor(label_selector)
+                if self._tracker:
+                    self._tracker.log_monitor_result(
+                        iteration,
+                        monitor_result.is_success,
+                        monitor_result.message,
+                    )
 
-            # ── Step 3: Evaluate ──────────────────────────────────
-            if monitor_result.is_success:
-                record.outcome = "success"
-                record.duration_seconds = time.time() - iter_start
-                records.append(record)
-                self._print_success_panel(iteration, records)
-                return LoopResult(
-                    success=True,
-                    total_iterations=iteration,
-                    records=records,
-                    final_yaml=current_yaml,
-                )
+                # ── Step 3: Evaluate ──────────────────────────────────
+                if monitor_result.is_success:
+                    record.outcome = "success"
+                    record.duration_seconds = time.time() - iter_start
+                    records.append(record)
+                    self._print_success_panel(iteration, records)
+                    if self._tracker:
+                        self._tracker.log_iteration_end(iteration, record.outcome, record.duration_seconds)
+                        self._tracker.log_final_result(success=True, total_iterations=iteration)
+                    unhandled_error = False
+                    return LoopResult(
+                        success=True,
+                        total_iterations=iteration,
+                        records=records,
+                        final_yaml=current_yaml,
+                    )
 
-            # ── Failure path ──────────────────────────────────────
+                # ── Failure path ──────────────────────────────────────
             record.failure_reason = monitor_result.message
             self._print_failure_details(monitor_result)
 
-            # ── Step 4: Debug ─────────────────────────────────────
-            failing_pods = monitor_result.failing_pods or monitor_result.pod_statuses
-            debug_bundle = self._step_debug(failing_pods)
+                # ── Step 4: Debug ─────────────────────────────────────
+                failing_pods = monitor_result.failing_pods or monitor_result.pod_statuses
+                debug_bundle = self._step_debug(failing_pods)
+                if self._tracker:
+                    self._tracker.log_debug_bundle(iteration, debug_bundle)
 
-            # ── Step 5: LLM Reasoning ─────────────────────────────
-            try:
-                diagnosis = self._step_llm(
-                    current_yaml, debug_bundle, iteration, max_iter
-                )
-            except (LLMEngineError, Exception) as e:
-                console.print(
-                    f"[bold red]  LLM Error:[/] {escape(str(e))}"
-                )
-                record.outcome = "llm_error"
-                record.duration_seconds = time.time() - iter_start
-                records.append(record)
-                continue
+                # ── Step 5: LLM Reasoning ─────────────────────────────
+                llm_start_time = time.time()
+                try:
+                    diagnosis = self._step_llm(
+                        current_yaml, debug_bundle, iteration, max_iter
+                    )
+                    if self._tracker:
+                        self._tracker.log_llm_result(iteration, diagnosis, time.time() - llm_start_time)
+                except (LLMEngineError, Exception) as e:
+                    if self._tracker:
+                        self._tracker.log_llm_error(iteration, e)
+                    console.print(
+                        f"[bold red]  LLM Error:[/] {escape(str(e))}"
+                    )
+                    record.outcome = "llm_error"
+                    record.duration_seconds = time.time() - iter_start
+                    records.append(record)
+                    if self._tracker:
+                        self._tracker.log_iteration_end(iteration, record.outcome, record.duration_seconds)
+                    continue
 
-            record.llm_root_cause = diagnosis.root_cause
-            record.llm_confidence = diagnosis.confidence_score
-            self._print_diagnosis_panel(diagnosis)
+                record.llm_root_cause = diagnosis.root_cause
+                record.llm_confidence = diagnosis.confidence_score
+                self._print_diagnosis_panel(diagnosis)
 
             # ── Step 6: Show corrected YAML ───────────────────────
             self._print_corrected_yaml(diagnosis.corrected_yaml)
@@ -218,6 +266,7 @@ class AgentLoop:
                 record.outcome = "dry_run"
                 record.duration_seconds = time.time() - iter_start
                 records.append(record)
+                unhandled_error = False
                 return LoopResult(
                     success=False,
                     total_iterations=iteration,
@@ -226,26 +275,35 @@ class AgentLoop:
                     final_diagnosis=diagnosis,
                 )
 
-            # ── Step 7: Update manifest for next iteration ────────
-            current_yaml = diagnosis.corrected_yaml
-            record.outcome = "retrying"
-            record.duration_seconds = time.time() - iter_start
-            records.append(record)
+                # ── Step 7: Update manifest for next iteration ────────
+                current_yaml = diagnosis.corrected_yaml
+                record.outcome = "retrying"
+                record.duration_seconds = time.time() - iter_start
+                records.append(record)
+                if self._tracker:
+                    self._tracker.log_iteration_end(iteration, record.outcome, record.duration_seconds)
 
-            if iteration < max_iter:
-                console.print(
-                    f"\n[dim]  Applying corrected manifest in "
-                    f"next iteration...[/]\n"
-                )
+                if iteration < max_iter:
+                    console.print(
+                        f"\n[dim]  Applying corrected manifest in "
+                        f"next iteration...[/]\n"
+                    )
 
-        # ── Exhausted all iterations ──────────────────────────────
-        self._print_exhausted_panel(max_iter, records)
-        return LoopResult(
-            success=False,
-            total_iterations=max_iter,
-            records=records,
-            final_yaml=current_yaml,
-        )
+            # ── Exhausted all iterations ──────────────────────────────
+            self._print_exhausted_panel(max_iter, records)
+            if self._tracker:
+                self._tracker.log_final_result(success=False, total_iterations=max_iter)
+            unhandled_error = False
+            return LoopResult(
+                success=False,
+                total_iterations=max_iter,
+                records=records,
+                final_yaml=current_yaml,
+            )
+        finally:
+            if self._tracker:
+                status = "FAILED" if unhandled_error else "FINISHED"
+                self._tracker.end_run(status=status)
 
     # ── Step implementations ──────────────────────────────────────
 

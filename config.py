@@ -48,10 +48,32 @@ class Settings(BaseSettings):
         description="If True, corrected YAML is printed but never applied.",
     )
 
-    # ── Logging ───────────────────────────────────────────────────────
+    # ── Logging & Observability ───────────────────────────────────────
     log_level: str = Field(
         default="INFO",
         description="Logging verbosity: DEBUG, INFO, WARNING, ERROR.",
+    )
+    
+    # MLflow Integration
+    enable_mlflow: bool = Field(
+        default=False,
+        description="Enable MLflow observability tracking.",
+    )
+    mlflow_tracking_uri: str = Field(
+        default="file:./mlruns",
+        description="MLflow tracking URI (e.g. 'databricks' or 'file:./mlruns').",
+    )
+    mlflow_experiment_name: str = Field(
+        default="kube-autofix-agent-observability",
+        description="Name of the MLflow experiment.",
+    )
+    mlflow_run_name_prefix: str = Field(
+        default="kube-autofix",
+        description="Prefix for MLflow run names.",
+    )
+    mlflow_log_prompts: bool = Field(
+        default=False,
+        description="If True, log full prompts and sensitive cluster data to MLflow.",
     )
 
     # ── K8s monitoring ────────────────────────────────────────────────

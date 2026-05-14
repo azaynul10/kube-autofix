@@ -7,3 +7,4 @@ rich>=13.7.0,<14.0.0
 python-dotenv>=1.0.0,<2.0.0
 tenacity>=8.3.0,<9.0.0
 click>=8.1.0,<9.0.0
+mlflow>=3.0.0

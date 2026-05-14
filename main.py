@@ -75,6 +75,14 @@ def _print_config_panel(console: Console, settings: Settings, manifest_path: str
         f"[bold]Poll Interval:[/]  [cyan]{settings.poll_interval_seconds}s[/]",
         f"[bold]Log Level:[/]      [cyan]{settings.log_level}[/]",
     ]
+    
+    if settings.enable_mlflow:
+        lines.append(f"[bold]MLflow Enabled:[/]  [green]Yes[/]")
+        lines.append(f"[bold]MLflow URI:[/]      [cyan]{settings.mlflow_tracking_uri}[/]")
+        lines.append(f"[bold]MLflow Exp:[/]      [cyan]{settings.mlflow_experiment_name}[/]")
+    else:
+        lines.append(f"[bold]MLflow Enabled:[/]  [yellow]No[/]")
+        
     console.print(
         Panel(
             "\n".join(lines),
@@ -114,11 +122,18 @@ def _print_config_panel(console: Console, settings: Settings, manifest_path: str
     default=None,
     help="Logging verbosity (default: INFO).",
 )
+@click.option(
+    "--enable-mlflow",
+    is_flag=True,
+    default=False,
+    help="Enable Databricks/MLflow observability tracking.",
+)
 def main(
     manifest: str,
     dry_run: bool,
     max_iterations: int | None,
     log_level: str | None,
+    enable_mlflow: bool,
 ) -> None:
     """
     Kube-AutoFix: Autonomous Kubernetes Debugging Agent.
@@ -141,6 +156,8 @@ def main(
             overrides["max_iterations"] = max_iterations
         if log_level is not None:
             overrides["log_level"] = log_level.upper()
+        if enable_mlflow:
+            overrides["enable_mlflow"] = True
 
         settings = Settings(**overrides)  # type: ignore[arg-type]
     except Exception as e:
@@ -218,7 +235,13 @@ def main(
         )
         sys.exit(1)
 
-    # ── Run the agent loop ────────────────────────────────────────
+    try:
+        from observability.mlflow_tracker import MLflowTracker
+        tracker = MLflowTracker(settings)
+    except Exception as e:
+        logger.warning(f"Failed to initialize MLflow tracker: {e}")
+        tracker = None
+
     agent = AgentLoop(
         deployer=deployer,
         monitor=monitor,
@@ -226,10 +249,11 @@ def main(
         llm_engine=llm_engine,
         settings=settings,
         console=console,
+        tracker=tracker,
     )
 
     try:
-        result = agent.run(initial_yaml)
+        result = agent.run(initial_yaml, manifest_name=manifest_path.name)
     except KeyboardInterrupt:
         console.print(
             "\n[bold yellow]Interrupted by user (Ctrl+C).[/]"

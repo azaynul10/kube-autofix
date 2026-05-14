@@ -294,6 +294,49 @@ class LLMDiagnosis(BaseModel):
 
 ## 👨‍💻 About the Author
 
+## Databricks / MLflow Agent Observability
+
+AI agents need observability because they operate autonomously and can make incorrect or unsafe decisions. Tracking metrics, parameters, and artifacts enables proper evaluation and debugging.
+
+### MLflow Observability Demo
+
+Demo recording generated from synthetic MLflow traces to show the observability interface. No live Kubernetes cluster or OpenAI call was executed in this environment.
+
+![MLflow Observability Demo](assets/mlflow-dashboard-demo.webp)
+
+To reproduce the demo locally:
+
+```bash
+python scripts/populate_demo_mlflow.py
+mlflow ui --backend-store-uri ./mlruns
+```
+
+Kube-AutoFix logs the following to MLflow:
+- Metrics: Iteration duration, LLM confidence scores, success rate, pod counts.
+- Parameters: Target namespace, LLM model, execution mode.
+- Artifacts: Corrected YAML per iteration, root cause analysis, LLM changes, and debug summaries (sensitive info redacted).
+
+### Run Locally
+
+To run locally and track with a local MLflow file store:
+
+```bash
+pip install -r requirements.txt
+python main.py -m manifests/sample_broken.yaml --dry-run --enable-mlflow
+```
+
+### Connect to Databricks-Hosted MLflow
+
+To connect the agent to a remote Databricks MLflow workspace:
+
+```bash
+export MLFLOW_TRACKING_URI=databricks
+export MLFLOW_EXPERIMENT_NAME=/Users/<email>/kube-autofix-agent-observability
+export DATABRICKS_HOST=https://<workspace-url>
+export DATABRICKS_TOKEN=<token>
+python main.py -m manifests/sample_broken.yaml --dry-run --enable-mlflow
+```
+
 <p align="center">
   <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYmN4YnI0OWN4aDVjNTZlZTdyeWZjdm9nbWRrbmRvcjV1ZTV4a2prZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/qgQUggAC3Pfv687qPC/giphy.gif" width="300" alt="Developer coding" />
 </p>
